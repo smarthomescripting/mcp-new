@@ -18,7 +18,7 @@ mcp = FastMCP("IBAN Checker")
 # constructor argument.
 mcp.settings.json_response = True
 
-LOG_PATH = Path(__file__).with_name("mcp.log")
+LOG_PATH = ("/home/mcp-new/mcp.log")
 
 
 def log_interaction(action: str, input_data: Any, output_data: Any) -> None:
