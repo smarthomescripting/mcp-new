@@ -1,7 +1,7 @@
 # iban_mcp_server.py
 import json
+import logging
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Optional
 
 import uvicorn
@@ -18,11 +18,11 @@ mcp = FastMCP("IBAN Checker")
 # constructor argument.
 mcp.settings.json_response = True
 
-LOG_PATH = Path("/home/mcp-new/mcp.log")
+logger = logging.getLogger("uvicorn.error")
 
 
 def log_interaction(action: str, input_data: Any, output_data: Any) -> None:
-    """Append a structured log entry to mcp.log and stdout.
+    """Emit a structured log entry via the standard uvicorn logger.
 
     Uses JSON Lines format so each interaction stays on a single line.
     Falls back to stringifying objects that are not JSON serializable to
@@ -36,8 +36,6 @@ def log_interaction(action: str, input_data: Any, output_data: Any) -> None:
         "output": output_data,
     }
 
-    LOG_PATH.touch(exist_ok=True)
-
     try:
         serialized = json.dumps(entry, ensure_ascii=False)
     except TypeError:
@@ -49,11 +47,7 @@ def log_interaction(action: str, input_data: Any, output_data: Any) -> None:
         }
         serialized = json.dumps(sanitized_entry, ensure_ascii=False)
 
-    with LOG_PATH.open("a", encoding="utf-8") as log_file:
-        log_file.write(serialized + "\n")
-
-    # Also emit to stdout so operators can tail logs without opening the file.
-    print(serialized, flush=True)
+    logger.info(serialized)
 
 
 class IbanResult(BaseModel):
