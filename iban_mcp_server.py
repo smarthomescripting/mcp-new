@@ -18,7 +18,7 @@ mcp = FastMCP("IBAN Checker")
 # constructor argument.
 mcp.settings.json_response = True
 
-LOG_PATH = ("/home/mcp-new/mcp.log")
+LOG_PATH = Path("/home/mcp-new/mcp.log")
 
 
 def log_interaction(action: str, input_data: Any, output_data: Any) -> None:
@@ -88,48 +88,50 @@ def iban_check(iban: str) -> IbanResult:
     return IbanResult(**result_dict)
 
 
-if __name__ == "__main__":
-    # Streamable HTTP transport; by default this serves on http://localhost:8000/mcp
-    # (same pattern as the official FastMCP quickstart).
-    log_interaction("startup", {}, {"message": "IBAN MCP server starting"})
+# Streamable HTTP transport; by default this serves on http://localhost:8000/mcp
+# (same pattern as the official FastMCP quickstart).
+log_interaction("startup", {}, {"message": "IBAN MCP server starting"})
 
-    app = mcp.streamable_http_app()
+app = mcp.streamable_http_app()
 
-    @app.middleware("http")
-    async def log_requests(request: Request, call_next):
-        request_body = await request.body()
-        request_info: dict[str, Any] = {
-            "method": request.method,
-            "path": request.url.path,
-            "query": request.url.query,
-            "client": request.client.host if request.client else None,
-        }
 
-        if request_body:
-            try:
-                payload = json.loads(request_body.decode("utf-8"))
-                if isinstance(payload, dict):
-                    request_info["jsonrpc_method"] = payload.get("method")
-                    if "params" in payload and isinstance(payload["params"], dict):
-                        request_info["param_keys"] = sorted(payload["params"].keys())
-            except Exception as exc:  # pragma: no cover - logging should not break requests
-                request_info["body_parse_error"] = str(exc)
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    request_body = await request.body()
+    request_info: dict[str, Any] = {
+        "method": request.method,
+        "path": request.url.path,
+        "query": request.url.query,
+        "client": request.client.host if request.client else None,
+    }
 
-        response: Response | None = None
-        error_detail: dict[str, Any] | None = None
-
+    if request_body:
         try:
-            response = await call_next(request)
-            return response
-        except Exception as exc:
-            error_detail = {"error": str(exc), "type": exc.__class__.__name__}
-            raise
-        finally:
-            output_data: dict[str, Any] = {"status_code": response.status_code if response else None}
-            if error_detail:
-                output_data.update(error_detail)
-            log_interaction("http_request", request_info, output_data)
+            payload = json.loads(request_body.decode("utf-8"))
+            if isinstance(payload, dict):
+                request_info["jsonrpc_method"] = payload.get("method")
+                if "params" in payload and isinstance(payload["params"], dict):
+                    request_info["param_keys"] = sorted(payload["params"].keys())
+        except Exception as exc:  # pragma: no cover - logging should not break requests
+            request_info["body_parse_error"] = str(exc)
 
+    response: Response | None = None
+    error_detail: dict[str, Any] | None = None
+
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as exc:
+        error_detail = {"error": str(exc), "type": exc.__class__.__name__}
+        raise
+    finally:
+        output_data: dict[str, Any] = {"status_code": response.status_code if response else None}
+        if error_detail:
+            output_data.update(error_detail)
+        log_interaction("http_request", request_info, output_data)
+
+
+if __name__ == "__main__":
     uvicorn.run(
         app,
         host=mcp.settings.host,
