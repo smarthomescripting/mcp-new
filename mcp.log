@@ -1,0 +1,5 @@
+{"timestamp": "2025-11-26T08:15:24.062269Z", "action": "startup", "input": {}, "output": {"message": "IBAN MCP server starting"}}
+{"timestamp": "2025-11-26T08:32:52.472912Z", "action": "startup", "input": {}, "output": {"message": "IBAN MCP server starting"}}
+{"timestamp": "2025-11-26T08:36:55.130799Z", "action": "startup", "input": {}, "output": {"message": "IBAN MCP server starting"}}
+{"timestamp": "2025-11-26T08:37:07.472451Z", "action": "startup", "input": {}, "output": {"message": "IBAN MCP server starting"}}
+{"timestamp": "2025-11-26T08:50:08.731652Z", "action": "startup", "input": {}, "output": {"message": "IBAN MCP server starting"}}
