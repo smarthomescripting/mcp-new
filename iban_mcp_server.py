@@ -65,7 +65,16 @@ def iban_check(iban: str) -> IbanResult:
     Returns:
         IbanResult: {valid, normalized_iban, country, reason}
     """
-    result_dict = validate_iban(iban)
+    try:
+        result_dict = validate_iban(iban)
+    except Exception as exc:  # pragma: no cover - defensive logging for unexpected errors
+        log_interaction(
+            "iban_check_error",
+            {"iban": iban},
+            {"error": str(exc), "type": exc.__class__.__name__},
+        )
+        raise
+
     log_interaction("iban_check", {"iban": iban}, result_dict)
     return IbanResult(**result_dict)
 
@@ -73,4 +82,5 @@ def iban_check(iban: str) -> IbanResult:
 if __name__ == "__main__":
     # Streamable HTTP transport; by default this serves on http://localhost:8000/mcp
     # (same pattern as the official FastMCP quickstart).
+    log_interaction("startup", {}, {"message": "IBAN MCP server starting"})
     mcp.run(transport="streamable-http")
