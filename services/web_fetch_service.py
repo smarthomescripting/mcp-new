@@ -51,7 +51,7 @@ def register_web_fetch_service(mcp: FastMCP) -> None:
     """Register a tool that fetches a URL and returns plain text content."""
 
     @mcp.tool()
-    def fetch_plain_text(url: str) -> dict[str, str]:
+    def fetch_text_from_url(url: str) -> dict[str, str]:
         """Fetch the given URL and return its plain text content."""
 
         request = urllib.request.Request(url, headers={"User-Agent": "mcp-web-fetch/1.0"})
@@ -62,12 +62,12 @@ def register_web_fetch_service(mcp: FastMCP) -> None:
                 charset = response.headers.get_content_charset("utf-8")
         except urllib.error.URLError as exc:
             error_detail = {"error": str(exc.reason) if hasattr(exc, "reason") else str(exc)}
-            log_interaction("fetch_plain_text_error", {"url": url}, error_detail)
+            log_interaction("fetch_text_from_url_error", {"url": url}, error_detail)
             raise
 
         decoded_content = io.TextIOWrapper(io.BytesIO(raw_bytes), encoding=charset, errors="replace").read()
         text = _extract_text(decoded_content, content_type)
 
         result = {"url": url, "text": text}
-        log_interaction("fetch_plain_text", {"url": url}, result)
+        log_interaction("fetch_text_from_url", {"url": url}, result)
         return result
