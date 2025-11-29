@@ -2,7 +2,12 @@
 from __future__ import annotations
 
 from mcp_framework import ServiceDefinition, attach_request_logger, create_mcp_server, log_interaction
-from services import register_echo_service, register_iban_service, register_web_fetch_service
+from services import (
+    register_echo_service,
+    register_iban_service,
+    register_math_service,
+    register_web_fetch_service,
+)
 
 services = [
     ServiceDefinition(
@@ -14,6 +19,11 @@ services = [
         name="web_fetch",
         description="Fetch a web page and return its plain text content.",
         register=register_web_fetch_service,
+    ),
+    ServiceDefinition(
+        name="math_operations",
+        description="Perform arithmetic calculations including factorial and Fibonacci.",
+        register=register_math_service,
     ),
     ServiceDefinition(
         name="echo",
