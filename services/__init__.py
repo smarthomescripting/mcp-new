@@ -2,6 +2,12 @@
 
 from .echo_service import register_echo_service
 from .iban_service import register_iban_service
+from .math_service import register_math_service
 from .web_fetch_service import register_web_fetch_service
 
-__all__ = ["register_iban_service", "register_echo_service", "register_web_fetch_service"]
+__all__ = [
+    "register_iban_service",
+    "register_echo_service",
+    "register_math_service",
+    "register_web_fetch_service",
+]
