@@ -13,7 +13,7 @@ from starlette.responses import Response
 from iban_utils import validate_iban
 
 # Create MCP server
-mcp = FastMCP("IBAN Checker", validate_output=False)
+mcp = FastMCP("IBAN Checker")
 # Configure JSON response at the settings level to avoid the deprecated
 # constructor argument.
 mcp.settings.json_response = True

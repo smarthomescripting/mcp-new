@@ -7,7 +7,7 @@ from mcp.server.fastmcp import FastMCP
 from iban_utils import validate_iban
 
 # Create MCP server
-mcp = FastMCP("IBAN Checker", json_response=True, validate_output=False)
+mcp = FastMCP("IBAN Checker", json_response=True)
 
 
 class IbanResult(BaseModel):
