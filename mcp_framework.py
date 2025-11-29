@@ -55,7 +55,7 @@ def create_mcp_server(
 ):
     """Create an MCP server instance and register all provided services."""
 
-    mcp = FastMCP(app_name, json_response=json_response, validate_output=False)
+    mcp = FastMCP(app_name, json_response=json_response)
 
     for service in services:
         service.register(mcp)
