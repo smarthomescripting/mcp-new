@@ -80,22 +80,47 @@ def register_web_fetch_service(mcp: FastMCP) -> None:
 
         archive_path = _archive_path(url)
         request = urllib.request.Request(url, headers={"User-Agent": "mcp-web-fetch/1.0"})
+
+        def _archive_response(action: str, error_detail: dict[str, str | int]):
+            archived_text = _load_from_archive(archive_path)
+            if archived_text is None:
+                return None
+
+            result = {"url": url, "text": archived_text, "source": "archive"}
+            log_interaction(
+                action,
+                {"url": url},
+                {"archive_path": str(archive_path), **error_detail},
+            )
+            return result
+
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
+                status = getattr(response, "status", response.getcode())
+                if status == 308:  # Explicitly handle permanent redirects via archive fallback
+                    raise urllib.error.HTTPError(
+                        url, status, "Permanent Redirect", hdrs=response.headers, fp=None
+                    )
+
                 raw_bytes = response.read()
                 content_type = response.headers.get_content_type()
                 charset = response.headers.get_content_charset("utf-8")
-        except Exception as exc:  # urllib errors and other unexpected issues
+        except urllib.error.HTTPError as exc:
+            error_detail = {"error": str(exc), "status": exc.code}
+            archive_action = (
+                "fetch_plain_text_archive_redirect" if exc.code == 308 else "fetch_plain_text_archive_fallback"
+            )
+            archive_result = _archive_response(archive_action, error_detail)
+            if archive_result is not None:
+                return archive_result
+
+            log_interaction("fetch_plain_text_error", {"url": url}, error_detail)
+            raise
+        except Exception as exc:  # Other urllib errors and unexpected issues
             error_detail = {"error": str(exc)}
-            archived_text = _load_from_archive(archive_path)
-            if archived_text is not None:
-                result = {"url": url, "text": archived_text, "source": "archive"}
-                log_interaction(
-                    "fetch_plain_text_archive_fallback",
-                    {"url": url},
-                    {"archive_path": str(archive_path), **error_detail},
-                )
-                return result
+            archive_result = _archive_response("fetch_plain_text_archive_fallback", error_detail)
+            if archive_result is not None:
+                return archive_result
 
             log_interaction("fetch_plain_text_error", {"url": url}, error_detail)
             raise
