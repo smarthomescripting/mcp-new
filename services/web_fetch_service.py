@@ -1,14 +1,21 @@
 """Website fetch service that returns extracted plain text."""
 from __future__ import annotations
 
+import hashlib
 import io
+from pathlib import Path
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
 from html.parser import HTMLParser
 
 from fastmcp import FastMCP
 
 from mcp_framework import log_interaction
+
+
+ARCHIVE_DIR = Path("archive/news_crawler")
+ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class _TextExtractor(HTMLParser):
@@ -47,6 +54,23 @@ def _extract_text(content: str, content_type: str) -> str:
     return parser.get_text()
 
 
+def _archive_path(url: str) -> Path:
+    parsed = urlparse(url)
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]
+    hostname = parsed.netloc or "unknown_host"
+    return ARCHIVE_DIR / f"{hostname}_{digest}.txt"
+
+
+def _load_from_archive(path: Path) -> str | None:
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return None
+
+
+def _save_to_archive(path: Path, text: str) -> None:
+    path.write_text(text, encoding="utf-8")
+
+
 def register_web_fetch_service(mcp: FastMCP) -> None:
     """Register a tool that fetches a URL and returns plain text content."""
 
@@ -54,19 +78,32 @@ def register_web_fetch_service(mcp: FastMCP) -> None:
     def fetch_plain_text(url: str) -> dict[str, str]:
         """Fetch the given URL and return its plain text content."""
 
+        archive_path = _archive_path(url)
         request = urllib.request.Request(url, headers={"User-Agent": "mcp-web-fetch/1.0"})
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
                 raw_bytes = response.read()
                 content_type = response.headers.get_content_type()
                 charset = response.headers.get_content_charset("utf-8")
-        except urllib.error.URLError as exc:
-            error_detail = {"error": str(exc.reason) if hasattr(exc, "reason") else str(exc)}
+        except Exception as exc:  # urllib errors and other unexpected issues
+            error_detail = {"error": str(exc)}
+            archived_text = _load_from_archive(archive_path)
+            if archived_text is not None:
+                result = {"url": url, "text": archived_text, "source": "archive"}
+                log_interaction(
+                    "fetch_plain_text_archive_fallback",
+                    {"url": url},
+                    {"archive_path": str(archive_path), **error_detail},
+                )
+                return result
+
             log_interaction("fetch_plain_text_error", {"url": url}, error_detail)
             raise
 
         decoded_content = io.TextIOWrapper(io.BytesIO(raw_bytes), encoding=charset, errors="replace").read()
         text = _extract_text(decoded_content, content_type)
+
+        _save_to_archive(archive_path, text)
 
         result = {"url": url, "text": text}
         log_interaction("fetch_plain_text", {"url": url}, result)
