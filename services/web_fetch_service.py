@@ -6,7 +6,7 @@ import io
 from pathlib import Path
 import urllib.error
 import urllib.request
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from html.parser import HTMLParser
 
 from fastmcp import FastMCP
@@ -54,21 +54,36 @@ def _extract_text(content: str, content_type: str) -> str:
     return parser.get_text()
 
 
-def _archive_path(url: str) -> Path:
+def _archive_candidates(url: str) -> list[Path]:
     parsed = urlparse(url)
     digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]
     hostname = parsed.netloc or "unknown_host"
-    return ARCHIVE_DIR / f"{hostname}_{digest}.txt"
+
+    readable_parts = [quote(part, safe="") for part in parsed.path.split("/") if part]
+    if not readable_parts:
+        readable_parts = ["index"]
+    filename = "__".join(readable_parts)
+    if parsed.query:
+        query_digest = hashlib.sha256(parsed.query.encode("utf-8")).hexdigest()[:8]
+        filename = f"{filename}__q_{query_digest}"
+
+    return [
+        ARCHIVE_DIR / hostname / f"{filename}.txt",
+        ARCHIVE_DIR / f"{hostname}_{digest}.txt",
+    ]
 
 
-def _load_from_archive(path: Path) -> str | None:
-    if path.exists():
-        return path.read_text(encoding="utf-8")
+def _load_from_archives(paths: list[Path]) -> tuple[str, Path] | None:
+    for path in paths:
+        if path.exists():
+            return path.read_text(encoding="utf-8"), path
     return None
 
 
-def _save_to_archive(path: Path, text: str) -> None:
-    path.write_text(text, encoding="utf-8")
+def _save_to_archives(paths: list[Path], text: str) -> None:
+    for path in paths:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
 
 
 def register_web_fetch_service(mcp: FastMCP) -> None:
@@ -78,14 +93,15 @@ def register_web_fetch_service(mcp: FastMCP) -> None:
     def fetch_plain_text(url: str) -> dict[str, str]:
         """Fetch the given URL and return its plain text content."""
 
-        archive_path = _archive_path(url)
+        archive_paths = _archive_candidates(url)
         request = urllib.request.Request(url, headers={"User-Agent": "mcp-web-fetch/1.0"})
 
         def _archive_response(action: str, error_detail: dict[str, str | int]):
-            archived_text = _load_from_archive(archive_path)
-            if archived_text is None:
+            archive_hit = _load_from_archives(archive_paths)
+            if archive_hit is None:
                 return None
 
+            archived_text, archive_path = archive_hit
             result = {"url": url, "text": archived_text, "source": "archive"}
             log_interaction(
                 action,
@@ -128,7 +144,7 @@ def register_web_fetch_service(mcp: FastMCP) -> None:
         decoded_content = io.TextIOWrapper(io.BytesIO(raw_bytes), encoding=charset, errors="replace").read()
         text = _extract_text(decoded_content, content_type)
 
-        _save_to_archive(archive_path, text)
+        _save_to_archives(archive_paths, text)
 
         result = {"url": url, "text": text}
         log_interaction("fetch_plain_text", {"url": url}, result)
