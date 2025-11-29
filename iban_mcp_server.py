@@ -7,15 +7,15 @@ from typing import Any, Optional
 import uvicorn
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
 
 from iban_utils import validate_iban
 
-# Create MCP server
+# Create MCP server without using deprecated constructor parameters
 mcp = FastMCP("IBAN Checker")
-# Configure JSON response at the settings level to avoid the deprecated
-# constructor argument.
+# Configure JSON response at the settings level to avoid the deprecated constructor
 mcp.settings.json_response = True
 
 logger = logging.getLogger("uvicorn.error")
@@ -89,40 +89,47 @@ log_interaction("startup", {}, {"message": "IBAN MCP server starting"})
 app = mcp.streamable_http_app()
 
 
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    request_body = await request.body()
-    request_info: dict[str, Any] = {
-        "method": request.method,
-        "path": request.url.path,
-        "query": request.url.query,
-        "client": request.client.host if request.client else None,
-    }
+class RequestLoggerMiddleware(BaseHTTPMiddleware):
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        request_body = await request.body()
+        request_info: dict[str, Any] = {
+            "method": request.method,
+            "path": request.url.path,
+            "query": request.url.query,
+            "client": request.client.host if request.client else None,
+        }
 
-    if request_body:
+        if request_body:
+            try:
+                payload = json.loads(request_body.decode("utf-8"))
+                if isinstance(payload, dict):
+                    request_info["jsonrpc_method"] = payload.get("method")
+                    if "params" in payload and isinstance(payload["params"], dict):
+                        request_info["param_keys"] = sorted(payload["params"].keys())
+            except Exception as exc:  # pragma: no cover - logging should not break requests
+                request_info["body_parse_error"] = str(exc)
+
+        response: Response | None = None
+        error_detail: dict[str, Any] | None = None
+
         try:
-            payload = json.loads(request_body.decode("utf-8"))
-            if isinstance(payload, dict):
-                request_info["jsonrpc_method"] = payload.get("method")
-                if "params" in payload and isinstance(payload["params"], dict):
-                    request_info["param_keys"] = sorted(payload["params"].keys())
-        except Exception as exc:  # pragma: no cover - logging should not break requests
-            request_info["body_parse_error"] = str(exc)
+            response = await call_next(request)
+            return response
+        except Exception as exc:
+            error_detail = {"error": str(exc), "type": exc.__class__.__name__}
+            raise
+        finally:
+            output_data: dict[str, Any] = {
+                "status_code": response.status_code if response else None
+            }
+            if error_detail:
+                output_data.update(error_detail)
+            log_interaction("http_request", request_info, output_data)
 
-    response: Response | None = None
-    error_detail: dict[str, Any] | None = None
 
-    try:
-        response = await call_next(request)
-        return response
-    except Exception as exc:
-        error_detail = {"error": str(exc), "type": exc.__class__.__name__}
-        raise
-    finally:
-        output_data: dict[str, Any] = {"status_code": response.status_code if response else None}
-        if error_detail:
-            output_data.update(error_detail)
-        log_interaction("http_request", request_info, output_data)
+app.add_middleware(RequestLoggerMiddleware)
 
 
 if __name__ == "__main__":
