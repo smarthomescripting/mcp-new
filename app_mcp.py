@@ -6,6 +6,7 @@ from services import (
     register_echo_service,
     register_iban_service,
     register_math_service,
+    register_newsapi_service,
     register_web_fetch_service,
 )
 
@@ -19,6 +20,11 @@ services = [
         name="web_fetch",
         description="Fetch a web page and return its plain text content.",
         register=register_web_fetch_service,
+    ),
+    ServiceDefinition(
+        name="newsapi",
+        description="Search the NewsAPI.org index for articles by keyword.",
+        register=register_newsapi_service,
     ),
     ServiceDefinition(
         name="math_operations",
