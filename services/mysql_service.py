@@ -138,3 +138,11 @@ def register_mysql_service(mcp: FastMCP) -> None:
             result,
         )
         return result
+
+    # Verify connectivity as soon as the tools are registered so that callers know
+    # the database is reachable and properly configured.
+    with _get_connection() as conn:
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("SELECT DATABASE() AS db, CURRENT_USER() AS user")
+            startup_info = cursor.fetchone() or {}
+    log_interaction("mysql_startup_ping", {}, startup_info)
