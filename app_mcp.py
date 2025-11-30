@@ -7,6 +7,7 @@ from services import (
     register_iban_service,
     register_math_service,
     register_newsapi_service,
+    register_mysql_service,
     register_web_fetch_service,
 )
 
@@ -25,6 +26,11 @@ services = [
         name="newsapi",
         description="Search the NewsAPI.org index for articles by keyword.",
         register=register_newsapi_service,
+    ),
+    ServiceDefinition(
+        name="mysql",
+        description="Interact with the llm_playground MySQL database (DDL/DML).",
+        register=register_mysql_service,
     ),
     ServiceDefinition(
         name="math_operations",
