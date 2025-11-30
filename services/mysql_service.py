@@ -140,9 +140,16 @@ def register_mysql_service(mcp: FastMCP) -> None:
         return result
 
     # Verify connectivity as soon as the tools are registered so that callers know
-    # the database is reachable and properly configured.
-    with _get_connection() as conn:
-        with conn.cursor(dictionary=True) as cursor:
-            cursor.execute("SELECT DATABASE() AS db, CURRENT_USER() AS user")
-            startup_info = cursor.fetchone() or {}
-    log_interaction("mysql_startup_ping", {}, startup_info)
+    # the database is reachable and properly configured. If the database is
+    # temporarily unavailable we still want to register the tools so that callers
+    # receive a meaningful runtime error instead of the service failing to start.
+    try:
+        with _get_connection() as conn:
+            with conn.cursor(dictionary=True) as cursor:
+                cursor.execute("SELECT DATABASE() AS db, CURRENT_USER() AS user")
+                startup_info = cursor.fetchone() or {}
+        log_interaction("mysql_startup_ping", {}, startup_info)
+    except Exception as exc:  # pragma: no cover - defensive startup guard
+        log_interaction(
+            "mysql_startup_ping_failed", {"error": str(exc), "type": type(exc).__name__}, {}
+        )
