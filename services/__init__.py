@@ -4,6 +4,7 @@ from .echo_service import register_echo_service
 from .iban_service import register_iban_service
 from .math_service import register_math_service
 from .newsapi_service import register_newsapi_service
+from .mysql_service import register_mysql_service
 from .web_fetch_service import register_web_fetch_service
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "register_echo_service",
     "register_newsapi_service",
     "register_math_service",
+    "register_mysql_service",
     "register_web_fetch_service",
 ]
