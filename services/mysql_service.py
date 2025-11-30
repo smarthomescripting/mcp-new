@@ -107,7 +107,7 @@ def register_mysql_service(mcp: FastMCP) -> None:
             filters.append("table_name = %(table_name)s")
             params["table_name"] = table_name
 
-        query = f"
+        query = f"""
             SELECT
                 table_name,
                 column_name,
@@ -118,7 +118,7 @@ def register_mysql_service(mcp: FastMCP) -> None:
             FROM information_schema.columns
             WHERE {' AND '.join(filters)}
             ORDER BY table_name, ordinal_position
-        ""
+        """
 
         with _get_connection() as conn:
             with conn.cursor(dictionary=True) as cursor:
