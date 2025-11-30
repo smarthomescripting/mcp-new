@@ -97,6 +97,39 @@ def register_mysql_service(mcp: FastMCP) -> None:
         return info
 
     @mcp.tool()
+    def get_db_schema(table_name: str | None = None) -> dict[str, Any]:
+        """Describe tables and columns available in the ``llm_playground`` database."""
+
+        filters = ["table_schema = %(schema)s"]
+        params: dict[str, Any] = {"schema": DB_NAME}
+
+        if table_name:
+            filters.append("table_name = %(table_name)s")
+            params["table_name"] = table_name
+
+        query = f"
+            SELECT
+                table_name,
+                column_name,
+                data_type,
+                column_type,
+                is_nullable,
+                column_key
+            FROM information_schema.columns
+            WHERE {' AND '.join(filters)}
+            ORDER BY table_name, ordinal_position
+        ""
+
+        with _get_connection() as conn:
+            with conn.cursor(dictionary=True) as cursor:
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+
+        result = {"rowcount": len(rows), "rows": rows}
+        log_interaction("get_db_schema", params, result)
+        return result
+
+    @mcp.tool()
     def mysql_schema(sql: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Run a parameterized ``CREATE`` or ``ALTER`` statement against the schema."""
 

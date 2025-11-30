@@ -11,6 +11,12 @@ from services import (
     register_web_fetch_service,
 )
 
+SYSTEM_INSTRUCTIONS = (
+    "Always call the `get_db_schema` tool before running database-related queries or "
+    "deciding which data to request. Inspect the returned tables and columns and reason "
+    "from that schema information before proceeding."
+)
+
 services = [
     ServiceDefinition(
         name="iban",
@@ -44,7 +50,12 @@ services = [
     ),
 ]
 
-mcp, http_app = create_mcp_server(services, app_name="utility-suite", json_response=True)
+mcp, http_app = create_mcp_server(
+    services,
+    app_name="utility-suite",
+    instructions=SYSTEM_INSTRUCTIONS,
+    json_response=True,
+)
 attach_request_logger(http_app)
 
 log_interaction("startup", {"services": [service.name for service in services]}, {"app": "utility-suite"})

@@ -52,11 +52,12 @@ def create_mcp_server(
     services: Iterable[ServiceDefinition],
     *,
     app_name: str = "multi-service",
+    instructions: str | None = None,
     json_response: bool = True,
 ):
     """Create an MCP server instance and register all provided services."""
 
-    mcp = FastMCP(app_name)
+    mcp = FastMCP(app_name, instructions=instructions)
     mcp.settings.json_response = json_response
 
     for service in services:
