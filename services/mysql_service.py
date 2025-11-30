@@ -13,7 +13,10 @@ All tools require parameterized queries. Use ``%(name)s`` placeholders
 within SQL strings and provide matching entries in the ``params``
 dictionary to avoid SQL injection. The tools perform basic safety checks
 based on the SQL verb and reject obviously unsafe statements (e.g.,
-multiple statements separated by semicolons or disallowed verbs).
+multiple statements separated by semicolons or disallowed verbs). These
+tools execute against the live database (they are not suggestions or
+dry-run responses). Use ``mysql_ping`` to verify connectivity and
+context before issuing queries.
 """
 from __future__ import annotations
 
@@ -37,13 +40,19 @@ ALLOWED_DML = {"INSERT", "UPDATE", "DELETE"}
 
 
 def _get_connection():
-    return mysql.connector.connect(
+    """Open a connection with explicit autocommit control and sane defaults."""
+
+    conn = mysql.connector.connect(
         host=DB_HOST,
         port=DB_PORT,
         user=DB_USER,
         password=DB_PASSWORD,
         database=DB_NAME,
+        autocommit=False,
+        raise_on_warnings=True,
     )
+    conn.autocommit = False  # enforce transactional behavior for writes
+    return conn
 
 
 def _validate_single_statement(query: str) -> str:
@@ -75,6 +84,17 @@ def _run_statement(query: str, params: dict[str, Any] | None, expect_result: boo
 
 def register_mysql_service(mcp: FastMCP) -> None:
     """Register MySQL management tools for the ``llm_playground`` database."""
+
+    @mcp.tool()
+    def mysql_ping() -> dict[str, Any]:
+        """Test connectivity and report the current database/user context."""
+
+        with _get_connection() as conn:
+            with conn.cursor(dictionary=True) as cursor:
+                cursor.execute("SELECT DATABASE() AS db, CURRENT_USER() AS user")
+                info = cursor.fetchone() or {}
+        log_interaction("mysql_ping", {}, info)
+        return info
 
     @mcp.tool()
     def mysql_schema(sql: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
